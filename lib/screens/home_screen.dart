@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../services/roboflow_service.dart';
 import 'result_screen.dart';
-import 'live_detection_screen.dart';  // Add this import
+import 'live_detection_screen.dart'; // Add this import
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -92,17 +92,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     onPressed: () => _pickImage(ImageSource.gallery),
                   ),
-ElevatedButton.icon(
-  icon: Icon(Icons.videocam),
-  label: Text('Live Detection'),
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => LiveDetectionScreen()),
-    );
-  },
-),
-
+                  SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    icon: Icon(Icons.videocam),
+                    label: Text('Live Detection'),
+                    style: ElevatedButton.styleFrom(
+                      padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                      backgroundColor: Colors.green,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => LiveDetectionScreen()),
+                      );
+                    },
+                  ),
                 ],
               ),
           ],

@@ -17,8 +17,18 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
   List<CameraDescription>? _cameras;
   bool _isInitialized = false;
   bool _isDetecting = false;
+  bool _isSaving = false;
+  
+  // Beetle detection results
   List<BeetleDetection> _detections = [];
   int _beetleCount = 0;
+  
+  // Averaging feature variables
+  bool _isAveragingEnabled = false;
+  List<int> _recentCounts = [];
+  int _maxRecentCounts = 5;
+  double _averageBeetleCount = 0;
+  
   Timer? _detectionTimer;
   final RoboflowService _roboflowService = RoboflowService();
   
@@ -63,6 +73,26 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
     }
   }
   
+  // Update the average beetle count
+  void _updateAverage(int newCount) {
+    if (!_isAveragingEnabled) return;
+    
+    setState(() {
+      // Add new count to the list
+      _recentCounts.add(newCount);
+      
+      // Keep only the most recent counts
+      if (_recentCounts.length > _maxRecentCounts) {
+        _recentCounts.removeAt(0);
+      }
+      
+      // Calculate the average
+      if (_recentCounts.isNotEmpty) {
+        _averageBeetleCount = _recentCounts.reduce((a, b) => a + b) / _recentCounts.length;
+      }
+    });
+  }
+  
   Future<void> _processCurrentFrame() async {
     if (_isDetecting || _controller == null || !_controller!.value.isInitialized) {
       return;
@@ -72,7 +102,7 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
     
     try {
       // Capture frame
-      final image = await _controller!.takePicture();
+      final XFile image = await _controller!.takePicture();
       
       // Process with Roboflow API
       final detections = await _roboflowService.detectBeetles(File(image.path));
@@ -84,6 +114,9 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
           _beetleCount = detections.length;
           _isDetecting = false;
         });
+        
+        // Update the average
+        _updateAverage(detections.length);
       }
       
       // Clean up temporary file
@@ -100,6 +133,45 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
     }
   }
   
+  // Save current frame to dataset
+  Future<void> _captureAndSave() async {
+    if (_isSaving || _controller == null || !_controller!.value.isInitialized) {
+      return;
+    }
+    
+    setState(() {
+      _isSaving = true;
+    });
+    
+    try {
+      // Capture frame
+      final XFile image = await _controller!.takePicture();
+      
+      // Process with Roboflow API
+      final detections = await _roboflowService.detectBeetles(File(image.path));
+      
+      // Upload to Roboflow with appropriate tags
+      await _roboflowService.uploadToDataset(
+        File(image.path),
+        ['live_capture', 'beetle_count_${detections.length}', 'for_training']
+      );
+      
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Image captured and uploaded to dataset!'))
+      );
+    } catch (e) {
+      print('Error capturing image: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error capturing image: $e'))
+      );
+    } finally {
+      setState(() {
+        _isSaving = false;
+      });
+    }
+  }
+  
   @override
   Widget build(BuildContext context) {
     if (!_isInitialized) {
@@ -110,7 +182,30 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
     }
     
     return Scaffold(
-      appBar: AppBar(title: Text('Live Beetle Detection')),
+      appBar: AppBar(
+        title: Text('Live Beetle Detection'),
+        actions: [
+          // Toggle button for averaging
+          Switch(
+            value: _isAveragingEnabled,
+            onChanged: (value) {
+              setState(() {
+                _isAveragingEnabled = value;
+                if (!value) {
+                  _recentCounts.clear();
+                  _averageBeetleCount = 0;
+                }
+              });
+            },
+          ),
+          Padding(
+            padding: EdgeInsets.only(right: 16.0),
+            child: Center(
+              child: Text('Averaging'),
+            ),
+          ),
+        ],
+      ),
       body: Stack(
         children: [
           // Camera preview
@@ -135,6 +230,27 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
               ),
             ),
           ),
+          
+          // Average count indicator
+          if (_isAveragingEnabled)
+            Positioned(
+              top: 70, // Below the beetle count indicator
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.deepPurple.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Avg (${_recentCounts.length}/${_maxRecentCounts}): ${_averageBeetleCount.toStringAsFixed(1)}',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+              ),
+            ),
           
           // Processing indicator
           if (_isDetecting)
@@ -165,10 +281,27 @@ class _LiveDetectionScreenState extends State<LiveDetectionScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _processCurrentFrame,
-        tooltip: 'Detect beetles',
-        child: Icon(Icons.camera),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          // Photo capture button for dataset
+          FloatingActionButton(
+            onPressed: _isSaving ? null : _captureAndSave,
+            heroTag: "btn1",
+            backgroundColor: Colors.red,
+            child: _isSaving 
+                ? CircularProgressIndicator(color: Colors.white)
+                : Icon(Icons.add_a_photo),
+          ),
+          SizedBox(height: 16),
+          // Process current frame button
+          FloatingActionButton(
+            onPressed: _processCurrentFrame,
+            heroTag: "btn2",
+            tooltip: 'Detect beetles',
+            child: Icon(Icons.camera),
+          ),
+        ],
       ),
     );
   }
