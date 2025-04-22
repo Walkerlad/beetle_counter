@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Add Internet permission - critical for connecting to Roboflow API -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Add network state permission - helpful for checking connectivity -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+<uses-permission android:name="android.permission.CAMERA" />
+<uses-feature android:name="android.hardware.camera" />
+
+    
     <application
         android:label="beetle_counter"
         android:name="${applicationName}"
@@ -42,4 +50,9 @@
             <data android:mimeType="text/plain"/>
         </intent>
     </queries>
+    
+    <!-- Add this for newer Android versions (Android 10+) to fix back navigation -->
+    <meta-data
+        android:name="android:enableOnBackInvokedCallback"
+        android:value="true" />
 </manifest>

@@ -1,0 +1,3 @@
+Possible to improve the model as it goes? give the correct number of beetles after it predicts?
+
+when putting in the correct number, have it be an number entry field, not a +-1
